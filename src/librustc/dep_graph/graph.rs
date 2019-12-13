@@ -501,8 +501,8 @@ impl DepGraph {
         if cfg!(debug_assertions) {
             let current_dep_graph = &self.data.as_ref().unwrap().current;
 
-            Some((current_dep_graph.total_read_count.load(SeqCst),
-                  current_dep_graph.total_duplicate_read_count.load(SeqCst)))
+            Some((current_dep_graph.total_read_count.load(Relaxed),
+                  current_dep_graph.total_duplicate_read_count.load(Relaxed)))
         } else {
             None
         }
@@ -1114,7 +1114,7 @@ impl DepGraphData {
             if let Some(task_deps) = icx.task_deps {
                 let mut task_deps = task_deps.lock();
                 if cfg!(debug_assertions) {
-                    self.current.total_read_count.fetch_add(1, SeqCst);
+                    self.current.total_read_count.fetch_add(1, Relaxed);
                 }
                 if task_deps.read_set.insert(source) {
                     task_deps.reads.push(source);
@@ -1134,7 +1134,7 @@ impl DepGraphData {
                         }
                     }
                 } else if cfg!(debug_assertions) {
-                    self.current.total_duplicate_read_count.fetch_add(1, SeqCst);
+                    self.current.total_duplicate_read_count.fetch_add(1, Relaxed);
                 }
             }
         })
