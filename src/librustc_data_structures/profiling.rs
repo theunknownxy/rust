@@ -296,6 +296,7 @@ impl SelfProfilerRef {
         }
     }
 
+    #[inline]
     pub fn enabled(&self) -> bool {
         self.profiler.is_some()
     }
