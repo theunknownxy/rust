@@ -1015,6 +1015,10 @@ impl Session {
             .unwrap_or_else(|| if self.opts.optimize != OptLevel::No { 2 } else { 1 })
     }
 
+    pub fn xray_instruction_threshold(&self) -> &str {
+        self.opts.unstable_opts.xray_instruction_threshold.as_deref().unwrap_or("200")
+    }
+
     /// Calculates the flavor of LTO to use for this compilation.
     pub fn lto(&self) -> config::Lto {
         // If our target has codegen requirements ignore the command line

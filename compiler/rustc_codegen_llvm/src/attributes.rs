@@ -132,6 +132,12 @@ fn instrument_function_attr<'ll>(cx: &CodegenCx<'ll, '_>) -> Option<&'ll Attribu
             "instrument-function-entry-inlined",
             &mcount_name,
         ))
+    } else if cx.sess().opts.unstable_opts.xray_instrument {
+        Some(llvm::CreateAttrStringValue(
+            cx.llcx,
+            "xray-instruction-threshold",
+            cx.sess().xray_instruction_threshold(),
+        ))
     } else {
         None
     }
