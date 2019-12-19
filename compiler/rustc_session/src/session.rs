@@ -564,6 +564,12 @@ impl Session {
     pub fn time_passes(&self) -> bool {
         self.opts.debugging_opts.time_passes || self.opts.debugging_opts.time
     }
+    pub fn xray_instrument(&self) -> bool {
+        self.opts.debugging_opts.xray_instrument
+    }
+    pub fn xray_instruction_threshold(&self) -> usize {
+        self.opts.debugging_opts.xray_instruction_threshold.unwrap_or(200)
+    }
     pub fn instrument_mcount(&self) -> bool {
         self.opts.debugging_opts.instrument_mcount
     }

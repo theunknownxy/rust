@@ -108,6 +108,17 @@ fn set_instrument_function(cx: &CodegenCx<'ll, '_>, llfn: &'ll Value) {
             &mcount_name,
         );
     }
+    if cx.sess().xray_instrument() {
+        let threshold =
+            CString::new(format!("{}", cx.sess().xray_instruction_threshold()).as_str().as_bytes())
+                .unwrap();
+        llvm::AddFunctionAttrStringValue(
+            llfn,
+            llvm::AttributePlace::Function,
+            cstr!("xray-instruction-threshold"),
+            &threshold,
+        );
+    }
 }
 
 fn set_probestack(cx: &CodegenCx<'ll, '_>, llfn: &'ll Value) {
