@@ -29,6 +29,10 @@ session_sanitizer_not_supported = {$us} sanitizer is not supported for this targ
 
 session_sanitizers_not_supported = {$us} sanitizers are not supported for this target
 
+session_xray_mode_not_supported = {$us} xray mode is not supported for this target
+
+session_xray_modes_not_supported = {$us} xray modes are not supported for this target
+
 session_cannot_mix_and_match_sanitizers = `-Zsanitizer={$first}` is incompatible with `-Zsanitizer={$second}`
 
 session_cannot_enable_crt_static_linux = sanitizer is incompatible with statically linked libc, disable it using `-C target-feature=-crt-static`

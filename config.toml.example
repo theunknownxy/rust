@@ -297,6 +297,9 @@ changelog-seen = 2
 # Build the sanitizer runtimes
 #sanitizers = false
 
+# Build the xray runtimes
+#xray = false
+
 # Build the profiler runtime (required when compiling with options that depend
 # on this runtime, such as `-C profile-generate` or `-C instrument-coverage`).
 #profiler = false

@@ -5,7 +5,9 @@ use crate::lint;
 use crate::search_paths::SearchPath;
 use crate::utils::NativeLib;
 use rustc_errors::LanguageIdentifier;
-use rustc_target::spec::{CodeModel, LinkerFlavorCli, MergeFunctions, PanicStrategy, SanitizerSet};
+use rustc_target::spec::{
+    CodeModel, LinkerFlavorCli, MergeFunctions, PanicStrategy, SanitizerSet, XrayModeSet,
+};
 use rustc_target::spec::{
     RelocModel, RelroLevel, SplitDebuginfo, StackProtector, TargetTriple, TlsModel,
 };
@@ -370,6 +372,8 @@ mod desc {
     pub const parse_relro_level: &str = "one of: `full`, `partial`, or `off`";
     pub const parse_sanitizers: &str = "comma separated list of sanitizers: `address`, `cfi`, `hwaddress`, `kcfi`, `leak`, `memory`, `memtag`, `shadow-call-stack`, or `thread`";
     pub const parse_sanitizer_memory_track_origins: &str = "0, 1, or 2";
+    pub const parse_xray_modes: &str =
+        "comma separated list of xray modes: `basic`, `fdr` or `profiling`";
     pub const parse_cfguard: &str =
         "either a boolean (`yes`, `no`, `on`, `off`, etc), `checks`, or `nochecks`";
     pub const parse_cfprotection: &str = "`none`|`no`|`n` (default), `branch`, `return`, or `full`|`yes`|`y` (equivalent to `branch` and `return`)";
@@ -709,6 +713,22 @@ mod parse {
                 true
             }
             Some(_) => false,
+        }
+    }
+
+    pub(crate) fn parse_xray_modes(slot: &mut XrayModeSet, v: Option<&str>) -> bool {
+        if let Some(v) = v {
+            for s in v.split(',') {
+                *slot |= match s {
+                    "basic" => XrayModeSet::BASIC,
+                    "fdr" => XrayModeSet::FDR,
+                    "profiling" => XrayModeSet::PROFILING,
+                    _ => return false,
+                }
+            }
+            true
+        } else {
+            false
         }
     }
 
@@ -1688,6 +1708,8 @@ options! {
         Requires `-Clto[=[fat,yes]]`"),
     wasi_exec_model: Option<WasiExecModel> = (None, parse_wasi_exec_model, [TRACKED],
         "whether to build a wasi command or reactor"),
+    xray_modes: XrayModeSet = (XrayModeSet::BASIC | XrayModeSet::FDR | XrayModeSet::PROFILING, parse_xray_modes, [TRACKED],
+        "which xray mode runtimes to link"),
     // tidy-alphabetical-end
 
     // If you add a new option, please update:

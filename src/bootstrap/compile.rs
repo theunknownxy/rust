@@ -195,11 +195,13 @@ fn copy_third_party_objects(
         }
     }
 
-    if builder.config.sanitizers_enabled(target) && compiler.stage != 0 {
-        // The sanitizers are only copied in stage1 or above,
+    if (builder.config.sanitizers_enabled(target) || builder.config.xray_enabled(target))
+        && compiler.stage != 0
+    {
+        // The llvm runtimes (sanitizers, xray) are only copied in stage1 or above,
         // to avoid creating dependency on LLVM.
         target_deps.extend(
-            copy_sanitizers(builder, &compiler, target)
+            copy_llvm_runtimes(builder, &compiler, target)
                 .into_iter()
                 .map(|d| (d, DependencyType::Target)),
         );
@@ -445,13 +447,13 @@ impl Step for StdLink {
     }
 }
 
-/// Copies sanitizer runtime libraries into target libdir.
-fn copy_sanitizers(
+/// Copies LLVM runtime libraries into target libdir.
+fn copy_llvm_runtimes(
     builder: &Builder<'_>,
     compiler: &Compiler,
     target: TargetSelection,
 ) -> Vec<PathBuf> {
-    let runtimes: Vec<native::SanitizerRuntime> = builder.ensure(native::Sanitizers { target });
+    let runtimes: Vec<native::LlvmRuntime> = builder.ensure(native::LlvmRuntimes { target });
 
     if builder.config.dry_run() {
         return Vec::new();

@@ -62,6 +62,7 @@ ENV HOSTS=i686-unknown-linux-gnu
 ENV RUST_CONFIGURE_ARGS \
       --enable-full-tools \
       --enable-sanitizers \
+      --enable-xray \
       --enable-profiler \
       --set target.i686-unknown-linux-gnu.linker=clang \
       --build=i686-unknown-linux-gnu \

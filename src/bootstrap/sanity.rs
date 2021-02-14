@@ -92,7 +92,8 @@ pub fn check(build: &mut Build) {
                     .unwrap_or(true)
             })
             .any(|build_llvm_ourselves| build_llvm_ourselves);
-    let need_cmake = building_llvm || build.config.any_sanitizers_enabled();
+    let need_cmake =
+        building_llvm || build.config.any_sanitizers_enabled() || build.config.any_xray_enabled();
     if need_cmake {
         if cmd_finder.maybe_have("cmake").is_none() {
             eprintln!(

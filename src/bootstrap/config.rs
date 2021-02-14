@@ -74,6 +74,7 @@ pub struct Config {
     pub extended: bool,
     pub tools: Option<HashSet<String>>,
     pub sanitizers: bool,
+    pub xray: bool,
     pub profiler: bool,
     pub ignore_git: bool,
     pub exclude: Vec<TaskPath>,
@@ -438,6 +439,7 @@ pub struct Target {
     pub linker: Option<PathBuf>,
     pub ndk: Option<PathBuf>,
     pub sanitizers: Option<bool>,
+    pub xray: Option<bool>,
     pub profiler: Option<bool>,
     pub crt_static: Option<bool>,
     pub musl_root: Option<PathBuf>,
@@ -620,6 +622,7 @@ define_config! {
         tools: Option<HashSet<String>> = "tools",
         verbose: Option<usize> = "verbose",
         sanitizers: Option<bool> = "sanitizers",
+        xray: Option<bool> = "xray",
         profiler: Option<bool> = "profiler",
         cargo_native_static: Option<bool> = "cargo-native-static",
         low_priority: Option<bool> = "low-priority",
@@ -780,6 +783,7 @@ define_config! {
         llvm_libunwind: Option<String> = "llvm-libunwind",
         android_ndk: Option<String> = "android-ndk",
         sanitizers: Option<bool> = "sanitizers",
+        xray: Option<bool> = "xray",
         profiler: Option<bool> = "profiler",
         crt_static: Option<bool> = "crt-static",
         musl_root: Option<String> = "musl-root",
@@ -1024,6 +1028,7 @@ impl Config {
         config.tools = build.tools;
         set(&mut config.verbose, build.verbose);
         set(&mut config.sanitizers, build.sanitizers);
+        set(&mut config.xray, build.xray);
         set(&mut config.profiler, build.profiler);
         set(&mut config.cargo_native_static, build.cargo_native_static);
         set(&mut config.configure_args, build.configure_args);
@@ -1268,6 +1273,7 @@ impl Config {
                 target.wasi_root = cfg.wasi_root.map(PathBuf::from);
                 target.qemu_rootfs = cfg.qemu_rootfs.map(PathBuf::from);
                 target.sanitizers = cfg.sanitizers;
+                target.xray = cfg.xray;
                 target.profiler = cfg.profiler;
 
                 config.target_config.insert(TargetSelection::from_user(&triple), target);
@@ -1578,6 +1584,14 @@ impl Config {
 
     pub fn any_sanitizers_enabled(&self) -> bool {
         self.target_config.values().any(|t| t.sanitizers == Some(true)) || self.sanitizers
+    }
+
+    pub fn xray_enabled(&self, target: TargetSelection) -> bool {
+        self.target_config.get(&target).map(|t| t.xray).flatten().unwrap_or(self.xray)
+    }
+
+    pub fn any_xray_enabled(&self) -> bool {
+        self.target_config.values().any(|t| t.xray == Some(true)) || self.xray
     }
 
     pub fn profiler_enabled(&self, target: TargetSelection) -> bool {

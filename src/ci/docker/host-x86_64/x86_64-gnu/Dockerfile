@@ -24,6 +24,7 @@ RUN sh /scripts/sccache.sh
 ENV RUST_CONFIGURE_ARGS \
  --build=x86_64-unknown-linux-gnu \
  --enable-sanitizers \
+ --enable-xray \
  --enable-profiler \
  --enable-compiler-docs
 ENV SCRIPT python3 ../x.py --stage 2 test

@@ -2812,6 +2812,7 @@ pub(crate) mod dep_tracking {
     use rustc_target::spec::{CodeModel, MergeFunctions, PanicStrategy, RelocModel};
     use rustc_target::spec::{
         RelroLevel, SanitizerSet, SplitDebuginfo, StackProtector, TargetTriple, TlsModel,
+        XrayModeSet
     };
     use std::collections::hash_map::DefaultHasher;
     use std::collections::BTreeMap;
@@ -2881,6 +2882,7 @@ pub(crate) mod dep_tracking {
         NativeLib,
         NativeLibKind,
         SanitizerSet,
+        XrayModeSet,
         CFGuard,
         CFProtection,
         TargetTriple,

@@ -9,7 +9,7 @@ use crate::errors::{
     ProfileUseFileDoesNotExist, SanitizerCfiEnabled, SanitizerNotSupported, SanitizersNotSupported,
     SkippingConstChecks, SplitDebugInfoUnstablePlatform, StackProtectorNotSupportedForTarget,
     TargetRequiresUnwindTables, UnleashedFeatureHelp, UnstableVirtualFunctionElimination,
-    UnsupportedDwarfVersion,
+    UnsupportedDwarfVersion, XrayModeNotSupported, XrayModesNotSupported,
 };
 use crate::parse::{add_feature_diagnostics, ParseSess};
 use crate::search_paths::{PathKind, SearchPath};
@@ -1578,6 +1578,21 @@ fn validate_commandline_args_with_session_available(sess: &Session) {
         && !sess.opts.unstable_opts.unstable_options
     {
         sess.emit_err(SplitDebugInfoUnstablePlatform { debuginfo: sess.split_debuginfo() });
+    }
+
+    if sess.opts.unstable_opts.xray_instrument {
+        let supported_sanitizers = sess.target.options.supported_xray_modes;
+        let unsupported_xray_modes = sess.opts.unstable_opts.xray_modes - supported_sanitizers;
+
+        match unsupported_xray_modes.into_iter().count() {
+            0 => {}
+            1 => {
+                sess.emit_err(XrayModeNotSupported { us: unsupported_xray_modes.to_string() });
+            }
+            _ => {
+                sess.emit_err(XrayModesNotSupported { us: unsupported_xray_modes.to_string() });
+            }
+        }
     }
 }
 

@@ -84,6 +84,18 @@ pub struct SanitizersNotSupported {
 }
 
 #[derive(Diagnostic)]
+#[diag(session_sanitizer_not_supported)]
+pub struct XrayModeNotSupported {
+    pub us: String,
+}
+
+#[derive(Diagnostic)]
+#[diag(session_sanitizers_not_supported)]
+pub struct XrayModesNotSupported {
+    pub us: String,
+}
+
+#[derive(Diagnostic)]
 #[diag(session_cannot_mix_and_match_sanitizers)]
 pub struct CannotMixAndMatchSanitizers {
     pub first: String,

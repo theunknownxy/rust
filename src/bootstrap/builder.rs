@@ -637,7 +637,7 @@ impl<'a> Builder<'a> {
                 tool::Clippy,
                 tool::CargoClippy,
                 native::Llvm,
-                native::Sanitizers,
+                native::LlvmRuntimes,
                 tool::Rustfmt,
                 tool::Miri,
                 tool::CargoMiri,

@@ -24,7 +24,7 @@ use rustc_span::symbol::Symbol;
 use rustc_span::DebuggerVisualizerFile;
 use rustc_target::spec::crt_objects::{CrtObjects, LinkSelfContainedDefault};
 use rustc_target::spec::{Cc, LinkOutputKind, LinkerFlavor, LinkerFlavorCli, Lld, PanicStrategy};
-use rustc_target::spec::{RelocModel, RelroLevel, SanitizerSet, SplitDebuginfo};
+use rustc_target::spec::{RelocModel, RelroLevel, SanitizerSet, SplitDebuginfo, XrayModeSet};
 
 use super::archive::{ArchiveBuilder, ArchiveBuilderBuilder};
 use super::command::Command;
@@ -1105,23 +1105,43 @@ fn add_sanitizer_libraries(sess: &Session, crate_type: CrateType, linker: &mut d
 
     let sanitizer = sess.opts.unstable_opts.sanitizer;
     if sanitizer.contains(SanitizerSet::ADDRESS) {
-        link_sanitizer_runtime(sess, linker, "asan");
+        link_llvm_runtime(sess, linker, "asan");
     }
     if sanitizer.contains(SanitizerSet::LEAK) {
-        link_sanitizer_runtime(sess, linker, "lsan");
+        link_llvm_runtime(sess, linker, "lsan");
     }
     if sanitizer.contains(SanitizerSet::MEMORY) {
-        link_sanitizer_runtime(sess, linker, "msan");
+        link_llvm_runtime(sess, linker, "msan");
     }
     if sanitizer.contains(SanitizerSet::THREAD) {
-        link_sanitizer_runtime(sess, linker, "tsan");
+        link_llvm_runtime(sess, linker, "tsan");
     }
     if sanitizer.contains(SanitizerSet::HWADDRESS) {
-        link_sanitizer_runtime(sess, linker, "hwasan");
+        link_llvm_runtime(sess, linker, "hwasan");
     }
 }
 
-fn link_sanitizer_runtime(sess: &Session, linker: &mut dyn Linker, name: &str) {
+fn link_xray(sess: &Session, crate_type: CrateType, linker: &mut dyn Linker) {
+    if crate_type != CrateType::Executable || !sess.opts.unstable_opts.xray_instrument {
+        return;
+    }
+
+    let xray_modes = sess.opts.unstable_opts.xray_modes;
+    if !xray_modes.is_empty() {
+        link_llvm_runtime(sess, linker, "xray");
+    }
+    if xray_modes.contains(XrayModeSet::BASIC) {
+        link_llvm_runtime(sess, linker, "xray-basic");
+    }
+    if xray_modes.contains(XrayModeSet::FDR) {
+        link_llvm_runtime(sess, linker, "xray-fdr");
+    }
+    if xray_modes.contains(XrayModeSet::PROFILING) {
+        link_llvm_runtime(sess, linker, "xray-profiling");
+    }
+}
+
+fn link_llvm_runtime(sess: &Session, linker: &mut dyn Linker, name: &str) {
     fn find_sanitizer_runtime(sess: &Session, filename: &str) -> PathBuf {
         let session_tlib =
             filesearch::make_target_lib_path(&sess.sysroot, sess.opts.target_triple.triple());
@@ -1983,6 +2003,9 @@ fn linker_with_args<'a>(
 
     // Sanitizer libraries.
     add_sanitizer_libraries(sess, crate_type, cmd);
+
+    // xray libraries.
+    link_xray(sess, crate_type, cmd);
 
     // Object code from the current crate.
     // Take careful note of the ordering of the arguments we pass to the linker

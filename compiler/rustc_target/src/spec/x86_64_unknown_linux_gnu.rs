@@ -1,4 +1,4 @@
-use crate::spec::{Cc, LinkerFlavor, Lld, SanitizerSet, StackProbeType, Target};
+use crate::spec::{Cc, LinkerFlavor, Lld, SanitizerSet, StackProbeType, Target, XrayModeSet};
 
 pub fn target() -> Target {
     let mut base = super::linux_gnu_base::opts();
@@ -12,6 +12,7 @@ pub fn target() -> Target {
         | SanitizerSet::LEAK
         | SanitizerSet::MEMORY
         | SanitizerSet::THREAD;
+    base.supported_xray_modes = XrayModeSet::BASIC | XrayModeSet::FDR | XrayModeSet::PROFILING;
 
     Target {
         llvm_target: "x86_64-unknown-linux-gnu".into(),

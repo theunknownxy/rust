@@ -71,6 +71,7 @@ ENV HOSTS=x86_64-unknown-linux-gnu
 ENV RUST_CONFIGURE_ARGS \
       --enable-full-tools \
       --enable-sanitizers \
+      --enable-xray \
       --enable-profiler \
       --enable-compiler-docs \
       --set target.x86_64-unknown-linux-gnu.linker=clang \

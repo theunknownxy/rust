@@ -51,6 +51,7 @@ o("ninja", "llvm.ninja", "build LLVM using the Ninja generator (for MSVC, requir
 o("locked-deps", "build.locked-deps", "force Cargo.lock to be up to date")
 o("vendor", "build.vendor", "enable usage of vendored Rust crates")
 o("sanitizers", "build.sanitizers", "build the sanitizer runtimes (asan, lsan, msan, tsan, hwasan)")
+o("xray", "build.xray", "build the xray runtimes")
 o("dist-src", "rust.dist-src", "when building tarballs enables building a source tarball")
 o("cargo-native-static", "build.cargo-native-static", "static native libraries in cargo")
 o("profiler", "build.profiler", "build the profiler runtime")
