@@ -18,7 +18,9 @@ use rustc_span::edition::{Edition, DEFAULT_EDITION};
 use rustc_span::symbol::sym;
 use rustc_span::SourceFileHashAlgorithm;
 use rustc_target::spec::{CodeModel, LinkerFlavor, MergeFunctions, PanicStrategy};
-use rustc_target::spec::{RelocModel, RelroLevel, SanitizerSet, SplitDebuginfo, TlsModel};
+use rustc_target::spec::{
+    RelocModel, RelroLevel, SanitizerSet, SplitDebuginfo, TlsModel, XrayModeSet,
+};
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter::FromIterator;
@@ -771,6 +773,9 @@ fn test_debugging_options_tracking_hash() {
     tracked!(use_ctors_section, Some(true));
     tracked!(verify_llvm_ir, true);
     tracked!(wasi_exec_model, Some(WasiExecModel::Reactor));
+    tracked!(xray_instrument, true);
+    tracked!(xray_instruction_threshold, Some(123));
+    tracked!(xray_modes, XrayModeSet::BASIC);
 
     macro_rules! tracked_no_crate_hash {
         ($name: ident, $non_default_value: expr) => {

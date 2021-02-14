@@ -1461,6 +1461,17 @@ fn validate_commandline_args_with_session_available(sess: &Session) {
                                 disable it using `-C target-feature=-crt-static`",
         );
     }
+
+    if sess.opts.debugging_opts.xray_instrument {
+        const XRAY_SUPPORTED_TARGETS: &[&str] =
+            &["x86_64-unknown-linux-gnu", "x86_64-unknown-freebsd", "aarch64-unknown-linux-gnu"];
+        if !XRAY_SUPPORTED_TARGETS.contains(&&*sess.opts.target_triple.triple()) {
+            sess.err(&format!(
+                "`-Zxray-instrument` only works on targets: {}",
+                XRAY_SUPPORTED_TARGETS.join(", ")
+            ));
+        }
+    }
 }
 
 /// Holds data on the current incremental compilation session, if there is one.

@@ -694,6 +694,15 @@ impl FromStr for FramePointer {
     }
 }
 
+bitflags::bitflags! {
+    #[derive(Default, Encodable, Decodable)]
+    pub struct XrayModeSet: u8 {
+        const BASIC     = 1 << 0;
+        const FDR       = 1 << 1;
+        const PROFILING = 1 << 2;
+    }
+}
+
 impl ToJson for FramePointer {
     fn to_json(&self) -> Json {
         match *self {
@@ -702,6 +711,70 @@ impl ToJson for FramePointer {
             Self::MayOmit => "may-omit",
         }
         .to_json()
+    }
+}
+
+impl XrayModeSet {
+    /// Return the xray mode's name
+    ///
+    /// Returns none if the flags is a set of xray modes count not exactly one.
+    fn as_str(self) -> Option<&'static str> {
+        Some(match self {
+            XrayModeSet::BASIC => "basic",
+            XrayModeSet::FDR => "fdr",
+            XrayModeSet::PROFILING => "profiling",
+            _ => return None,
+        })
+    }
+}
+
+impl fmt::Display for XrayModeSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut first = true;
+        for s in *self {
+            let name = match s {
+                XrayModeSet::BASIC => "basic",
+                XrayModeSet::FDR => "fdr",
+                XrayModeSet::PROFILING => "profiling",
+                _ => panic!("unrecognized xray mode {:?}", s),
+            };
+            if !first {
+                f.write_str(",")?;
+            }
+            f.write_str(name)?;
+            first = false;
+        }
+        Ok(())
+    }
+}
+
+impl IntoIterator for XrayModeSet {
+    type Item = XrayModeSet;
+    type IntoIter = std::vec::IntoIter<XrayModeSet>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        [XrayModeSet::BASIC, XrayModeSet::FDR, XrayModeSet::PROFILING]
+            .iter()
+            .copied()
+            .filter(|&s| self.contains(s))
+            .collect::<Vec<_>>()
+            .into_iter()
+    }
+}
+
+impl<CTX> HashStable<CTX> for XrayModeSet {
+    fn hash_stable(&self, ctx: &mut CTX, hasher: &mut StableHasher) {
+        self.bits().hash_stable(ctx, hasher);
+    }
+}
+
+impl ToJson for XrayModeSet {
+    fn to_json(&self) -> Json {
+        self.into_iter()
+            .map(|v| Some(v.as_str()?.to_json()))
+            .collect::<Option<Vec<_>>>()
+            .unwrap_or(Vec::new())
+            .to_json()
     }
 }
 
@@ -1332,6 +1405,9 @@ pub struct TargetOptions {
     /// distributed with the target, the sanitizer should still appear in this list for the target.
     pub supported_sanitizers: SanitizerSet,
 
+    /// Supported xray modes by this target
+    pub supported_xray_modes: XrayModeSet,
+
     /// If present it's a default value to use for adjusting the C ABI.
     pub default_adjusted_cabi: Option<Abi>,
 }
@@ -1437,6 +1513,7 @@ impl Default for TargetOptions {
             has_thumb_interworking: false,
             split_debuginfo: SplitDebuginfo::Off,
             supported_sanitizers: SanitizerSet::empty(),
+            supported_xray_modes: XrayModeSet::empty(),
             default_adjusted_cabi: None,
         }
     }
@@ -1793,6 +1870,21 @@ impl Target {
                 }
                 Ok::<(), String>(())
             } );
+            ($key_name:ident, XrayModeSet) => ( {
+                let name = (stringify!($key_name)).replace("_", "-");
+                obj.find(&name[..]).and_then(|o| o.as_array()).and_then(|a| {
+                    for s in a {
+                        base.$key_name |= match s.as_string() {
+                            Some("basic") => XrayModeSet::BASIC,
+                            Some("fdr") => XrayModeSet::FDR,
+                            Some("profiling") => XrayModeSet::PROFILING,
+                            Some(s) => return Some(Err(format!("unknown xray mode {}", s))),
+                            _ => return Some(Err(format!("not a string: {:?}", s))),
+                        };
+                    }
+                    Some(Ok(()))
+                }).unwrap_or(Ok(()))
+            } );
 
             ($key_name:ident, crt_objects_fallback) => ( {
                 let name = (stringify!($key_name)).replace("_", "-");
@@ -2014,6 +2106,7 @@ impl Target {
         key!(has_thumb_interworking, bool);
         key!(split_debuginfo, SplitDebuginfo)?;
         key!(supported_sanitizers, SanitizerSet)?;
+        key!(supported_xray_modes, XrayModeSet)?;
         key!(default_adjusted_cabi, Option<Abi>)?;
 
         if base.is_builtin {

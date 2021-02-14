@@ -5,7 +5,9 @@ use crate::lint;
 use crate::search_paths::SearchPath;
 use crate::utils::NativeLib;
 
-use rustc_target::spec::{CodeModel, LinkerFlavor, MergeFunctions, PanicStrategy, SanitizerSet};
+use rustc_target::spec::{
+    CodeModel, LinkerFlavor, MergeFunctions, PanicStrategy, SanitizerSet, XrayModeSet,
+};
 use rustc_target::spec::{RelocModel, RelroLevel, SplitDebuginfo, TargetTriple, TlsModel};
 
 use rustc_feature::UnstableFeatures;
@@ -349,6 +351,8 @@ mod desc {
     pub const parse_sanitizers: &str =
         "comma separated list of sanitizers: `address`, `hwaddress`, `leak`, `memory` or `thread`";
     pub const parse_sanitizer_memory_track_origins: &str = "0, 1, or 2";
+    pub const parse_xray_modes: &str =
+        "comma separated list of xray modes: `basic`, `fdr` or `profiling`";
     pub const parse_cfguard: &str =
         "either a boolean (`yes`, `no`, `on`, `off`, etc), `checks`, or `nochecks`";
     pub const parse_strip: &str = "either `none`, `debuginfo`, or `symbols`";
@@ -598,6 +602,22 @@ mod parse {
                 true
             }
             Some(_) => false,
+        }
+    }
+
+    crate fn parse_xray_modes(slot: &mut XrayModeSet, v: Option<&str>) -> bool {
+        if let Some(v) = v {
+            for s in v.split(',') {
+                *slot |= match s {
+                    "basic" => XrayModeSet::BASIC,
+                    "fdr" => XrayModeSet::FDR,
+                    "profiling" => XrayModeSet::PROFILING,
+                    _ => return false,
+                }
+            }
+            true
+        } else {
+            false
         }
     }
 
@@ -1126,7 +1146,7 @@ options! {
         "insert function instrument code for mcount-based tracing (default: no)"),
     xray_instrument: bool = (false, parse_bool, [TRACKED],
         "enable XRay instrumentation"),
-    xray_instruction_threshold: Option<usize> = (None, parse_opt_uint, [TRACKED],
+    xray_instruction_threshold: Option<usize> = (None, parse_opt_number, [TRACKED],
         "instrument only functions with at least n instructions (default: 200)"),
     keep_hygiene_data: bool = (false, parse_bool, [UNTRACKED],
         "keep hygiene data after analysis (default: no)"),
@@ -1336,6 +1356,8 @@ options! {
         "verify LLVM IR (default: no)"),
     wasi_exec_model: Option<WasiExecModel> = (None, parse_wasi_exec_model, [TRACKED],
         "whether to build a wasi command or reactor"),
+    xray_modes: XrayModeSet = (XrayModeSet::BASIC | XrayModeSet::FDR | XrayModeSet::PROFILING, parse_xray_modes, [TRACKED],
+        "which xray mode runtimes to link"),
 
     // This list is in alphabetical order.
     //

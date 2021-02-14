@@ -691,22 +691,22 @@ impl Step for TestHelpers {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct Sanitizers {
+pub struct LlvmRuntimes {
     pub target: TargetSelection,
 }
 
-impl Step for Sanitizers {
-    type Output = Vec<SanitizerRuntime>;
+impl Step for LlvmRuntimes {
+    type Output = Vec<LlvmRuntime>;
 
     fn should_run(run: ShouldRun<'_>) -> ShouldRun<'_> {
-        run.path("src/llvm-project/compiler-rt").path("src/sanitizers")
+        run.path("src/llvm-project/compiler-rt").path("src/sanitizers").path("src/xray")
     }
 
     fn make_run(run: RunConfig<'_>) {
-        run.builder.ensure(Sanitizers { target: run.target });
+        run.builder.ensure(LlvmRuntimes { target: run.target });
     }
 
-    /// Builds sanitizer runtime libraries.
+    /// Builds compiler-rt runtime libraries.
     fn run(self, builder: &Builder<'_>) -> Self::Output {
         let compiler_rt_dir = builder.src.join("src/llvm-project/compiler-rt");
         if !compiler_rt_dir.exists() {
@@ -714,7 +714,11 @@ impl Step for Sanitizers {
         }
 
         let out_dir = builder.native_dir(self.target).join("sanitizers");
-        let runtimes = supported_sanitizers(&out_dir, self.target, &builder.config.channel);
+        let san_runtimes = supported_sanitizers(&out_dir, self.target, &builder.config.channel);
+        let xray_runtimes = xray_libs(&out_dir, self.target, &builder.config.channel);
+
+        let mut runtimes = san_runtimes.clone();
+        runtimes.extend(xray_runtimes.clone());
         if runtimes.is_empty() {
             return runtimes;
         }
@@ -724,20 +728,20 @@ impl Step for Sanitizers {
             return runtimes;
         }
 
-        let stamp = out_dir.join("sanitizers-finished-building");
+        let stamp = out_dir.join("llvm-runtimes-finished-building");
         let stamp = HashStamp::new(stamp, builder.in_tree_llvm_info.sha());
 
         if stamp.is_done() {
             if stamp.hash.is_none() {
                 builder.info(&format!(
-                    "Rebuild sanitizers by removing the file `{}`",
+                    "Rebuild llvm runtimes by removing the file `{}`",
                     stamp.path.display()
                 ));
             }
             return runtimes;
         }
 
-        builder.info(&format!("Building sanitizers for {}", self.target));
+        builder.info(&format!("Building LLVM runtimes for {}", self.target));
         t!(stamp.remove());
         let _time = util::timeit(&builder);
 
@@ -748,8 +752,11 @@ impl Step for Sanitizers {
         cfg.define("COMPILER_RT_BUILD_CRT", "OFF");
         cfg.define("COMPILER_RT_BUILD_LIBFUZZER", "OFF");
         cfg.define("COMPILER_RT_BUILD_PROFILE", "OFF");
-        cfg.define("COMPILER_RT_BUILD_SANITIZERS", "ON");
-        cfg.define("COMPILER_RT_BUILD_XRAY", "OFF");
+        cfg.define(
+            "COMPILER_RT_BUILD_SANITIZERS",
+            if san_runtimes.is_empty() { "OFF" } else { "ON" },
+        );
+        cfg.define("COMPILER_RT_BUILD_XRAY", if xray_runtimes.is_empty() { "OFF" } else { "ON" });
         cfg.define("COMPILER_RT_DEFAULT_TARGET_ONLY", "ON");
         cfg.define("COMPILER_RT_USE_LIBCXX", "OFF");
         cfg.define("LLVM_CONFIG_PATH", &llvm_config);
@@ -774,7 +781,7 @@ impl Step for Sanitizers {
 }
 
 #[derive(Clone, Debug)]
-pub struct SanitizerRuntime {
+pub struct LlvmRuntime {
     /// CMake target used to build the runtime.
     pub cmake_target: String,
     /// Path to the built runtime library.
@@ -783,49 +790,99 @@ pub struct SanitizerRuntime {
     pub name: String,
 }
 
+fn clang_rt_libs_darwin(
+    out_dir: &Path,
+    channel: &str,
+    os: &str,
+    components: &[&str],
+) -> Vec<LlvmRuntime> {
+    components
+        .iter()
+        .map(move |c| LlvmRuntime {
+            cmake_target: format!("clang_rt.{}_{}_dynamic", c, os),
+            path: out_dir.join(&format!("build/lib/darwin/libclang_rt.{}_{}_dynamic.dylib", c, os)),
+            name: format!("librustc-{}_rt.{}.dylib", channel, c),
+        })
+        .collect()
+}
+
+fn clang_rt_libs_common(
+    out_dir: &Path,
+    channel: &str,
+    os: &str,
+    arch: &str,
+    components: &[&str],
+) -> Vec<LlvmRuntime> {
+    components
+        .iter()
+        .map(move |c| LlvmRuntime {
+            cmake_target: format!("clang_rt.{}-{}", c, arch),
+            path: out_dir.join(&format!("build/lib/{}/libclang_rt.{}-{}.a", os, c, arch)),
+            name: format!("librustc-{}_rt.{}.a", channel, c),
+        })
+        .collect()
+}
+
 /// Returns sanitizers available on a given target.
 fn supported_sanitizers(
     out_dir: &Path,
     target: TargetSelection,
     channel: &str,
-) -> Vec<SanitizerRuntime> {
-    let darwin_libs = |os: &str, components: &[&str]| -> Vec<SanitizerRuntime> {
-        components
-            .iter()
-            .map(move |c| SanitizerRuntime {
-                cmake_target: format!("clang_rt.{}_{}_dynamic", c, os),
-                path: out_dir
-                    .join(&format!("build/lib/darwin/libclang_rt.{}_{}_dynamic.dylib", c, os)),
-                name: format!("librustc-{}_rt.{}.dylib", channel, c),
-            })
-            .collect()
-    };
-
-    let common_libs = |os: &str, arch: &str, components: &[&str]| -> Vec<SanitizerRuntime> {
-        components
-            .iter()
-            .map(move |c| SanitizerRuntime {
-                cmake_target: format!("clang_rt.{}-{}", c, arch),
-                path: out_dir.join(&format!("build/lib/{}/libclang_rt.{}-{}.a", os, c, arch)),
-                name: format!("librustc-{}_rt.{}.a", channel, c),
-            })
-            .collect()
-    };
-
+) -> Vec<LlvmRuntime> {
     match &*target.triple {
-        "aarch64-apple-darwin" => darwin_libs("osx", &["asan", "lsan", "tsan"]),
-        "aarch64-fuchsia" => common_libs("fuchsia", "aarch64", &["asan"]),
-        "aarch64-unknown-linux-gnu" => {
-            common_libs("linux", "aarch64", &["asan", "lsan", "msan", "tsan", "hwasan"])
+        "aarch64-apple-darwin" => {
+            clang_rt_libs_darwin(out_dir, channel, "osx", &["asan", "lsan", "tsan", "hwasan"])
         }
-        "x86_64-apple-darwin" => darwin_libs("osx", &["asan", "lsan", "tsan"]),
-        "x86_64-fuchsia" => common_libs("fuchsia", "x86_64", &["asan"]),
-        "x86_64-unknown-freebsd" => common_libs("freebsd", "x86_64", &["asan", "msan", "tsan"]),
+        "aarch64-fuchsia" => {
+            clang_rt_libs_common(out_dir, channel, "fuchsia", "aarch64", &["asan"])
+        }
+        "aarch64-unknown-linux-gnu" => clang_rt_libs_common(
+            out_dir,
+            channel,
+            "linux",
+            "aarch64",
+            &["asan", "lsan", "msan", "tsan"],
+        ),
+        "x86_64-apple-darwin" => {
+            clang_rt_libs_darwin(out_dir, channel, "osx", &["asan", "lsan", "tsan"])
+        }
+        "x86_64-fuchsia" => clang_rt_libs_common(out_dir, channel, "fuchsia", "x86_64", &["asan"]),
+        "x86_64-unknown-freebsd" => {
+            clang_rt_libs_common(out_dir, channel, "freebsd", "x86_64", &["asan", "msan", "tsan"])
+        }
+        "x86_64-unknown-linux-gnu" => clang_rt_libs_common(
+            out_dir,
+            channel,
+            "linux",
+            "x86_64",
+            &["asan", "lsan", "msan", "tsan"],
+        ),
+        "x86_64-unknown-linux-musl" => clang_rt_libs_common(
+            out_dir,
+            channel,
+            "linux",
+            "x86_64",
+            &["asan", "lsan", "msan", "tsan"],
+        ),
+        _ => Vec::new(),
+    }
+}
+
+/// Returns xray runtimes libraries available on a given target.
+fn xray_libs(out_dir: &Path, target: TargetSelection, channel: &str) -> Vec<LlvmRuntime> {
+    let xray_libs = &["xray", "xray-basic", "xray-fdr", "xray-profiling"];
+    match &*target.triple {
+        "aarch64-unknown-linux-gnu" => {
+            clang_rt_libs_common(out_dir, channel, "linux", "aarch64", xray_libs)
+        }
+        "x86_64-unknown-freebsd" => {
+            clang_rt_libs_common(out_dir, channel, "freebsd", "x86_64", xray_libs)
+        }
         "x86_64-unknown-linux-gnu" => {
-            common_libs("linux", "x86_64", &["asan", "lsan", "msan", "tsan"])
+            clang_rt_libs_common(out_dir, channel, "linux", "x86_64", xray_libs)
         }
         "x86_64-unknown-linux-musl" => {
-            common_libs("linux", "x86_64", &["asan", "lsan", "msan", "tsan"])
+            clang_rt_libs_common(out_dir, channel, "linux", "x86_64", xray_libs)
         }
         _ => Vec::new(),
     }
